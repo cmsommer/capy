@@ -17,10 +17,10 @@ const Display = struct { resolution: Size, dpi: u32 };
 const isErrorUnion = @import("internal.zig").isErrorUnion;
 
 const devices = std.StaticStringMap(Display).initComptime(.{
-    .{ "iphone-13-mini", .{ .resolution = Size.init(1080, 2340), .dpi = 476 } },
-    .{ "iphone-13", .{ .resolution = Size.init(1170, 2532), .dpi = 460 } },
-    .{ "pixel-6", .{ .resolution = Size.init(1080, 2400), .dpi = 411 } },
-    .{ "pixel-6-pro", .{ .resolution = Size.init(1440, 3120), .dpi = 512 } },
+    .{ "iphone-13-mini", Display{ .resolution = Size.init(1080, 2340), .dpi = 476 } },
+    .{ "iphone-13", Display{ .resolution = Size.init(1170, 2532), .dpi = 460 } },
+    .{ "pixel-6", Display{ .resolution = Size.init(1080, 2400), .dpi = 411 } },
+    .{ "pixel-6-pro", Display{ .resolution = Size.init(1440, 3120), .dpi = 512 } },
 });
 
 pub const Window = struct {
@@ -37,6 +37,7 @@ pub const Window = struct {
     /// This can be used for synchronizing animations to the window's monitor's sync rate.
     on_frame: *EventSource,
     animation_controller: *AnimationController,
+    visible: Atom(bool) = Atom(bool).of(false),
 
     pub const Feature = enum {
         Title,
@@ -68,11 +69,13 @@ pub const Window = struct {
 
     pub fn show(self: *Window) void {
         self.peer.setUserData(self);
-        return self.peer.show();
+        self.peer.show();
+        self.visible.set(true);
     }
 
     pub fn close(self: *Window) void {
-        return self.peer.close();
+        self.peer.close();
+        self.visible.set(false);
     }
 
     /// wrappedContainer can be an error union, a pointer to the container or the container itself.
@@ -129,8 +132,10 @@ pub const Window = struct {
     fn propertyChanged(name: []const u8, value: *const anyopaque, data: usize) void {
         const self: *Window = @ptrFromInt(data);
         if (std.mem.eql(u8, name, "tick_id")) {
-            _ = value;
             self.on_frame.callListeners();
+        } else if (std.mem.eql(u8, name, "visible")) {
+            const bool_ptr: *const bool = @ptrCast(value);
+            self.visible.set(bool_ptr.*);
         }
     }
 

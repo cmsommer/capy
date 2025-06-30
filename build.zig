@@ -69,7 +69,7 @@ fn installCapyDependencies(b: *std.Build, module: *std.Build.Module, options: Ca
             module.linkSystemLibrary("objc", .{ .use_pkg_config = .no });
         },
         .linux, .freebsd => {
-            if (target.result.isAndroid()) {
+            if (target.result.abi.isAndroid()) {
                 const sdk = AndroidSdk.init(b, null, .{});
                 var libraries = std.ArrayList([]const u8).init(b.allocator);
                 try libraries.append("android");
@@ -108,7 +108,7 @@ fn installCapyDependencies(b: *std.Build, module: *std.Build.Module, options: Ca
             }
         },
         .wasi => {
-            if (target.result.isWasm()) {
+            if (target.result.cpu.arch.isWasm()) {
                 // Things like the image reader require more stack than given by default
                 // TODO: remove once ziglang/zig#12589 is merged
                 module.export_symbol_names = &.{"_start"};
@@ -117,7 +117,7 @@ fn installCapyDependencies(b: *std.Build, module: *std.Build.Module, options: Ca
             }
         },
         .freestanding => {
-            if (target.result.isWasm()) {
+            if (target.result.cpu.arch.isWasm()) {
                 std.log.warn("For targeting the Web, WebAssembly builds must now be compiled using the `wasm32-wasi` target.", .{});
             }
             return error.UnsupportedOs;
@@ -219,7 +219,7 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    try installCapyDependencies(b, &tests.root_module, options);
+    try installCapyDependencies(b, tests.root_module, options);
     const run_tests = try runStep(tests, .{});
 
     const test_step = b.step("test", "Run unit tests and also generate the documentation");
@@ -234,7 +234,7 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = .Debug,
     });
-    try installCapyDependencies(b, &docs.root_module, options);
+    try installCapyDependencies(b, docs.root_module, options);
     const install_docs = b.addInstallDirectory(.{
         .source_dir = docs.getEmittedDocs(),
         .install_dir = .prefix,
@@ -255,7 +255,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
     coverage_tests.setExecCmd(&.{ "kcov", "--clean", "--include-pattern=src/", "kcov-output", null });
-    try installCapyDependencies(b, &coverage_tests.root_module, options);
+    try installCapyDependencies(b, coverage_tests.root_module, options);
 
     const run_coverage_tests = b.addSystemCommand(&.{ "kcov", "--clean", "--include-pattern=src/", "kcov-output" });
     run_coverage_tests.addArtifactArg(coverage_tests);
